@@ -2,25 +2,25 @@ import timeago from '../../utils/timeago.js';
 
 //read.js
 //获取应用实例
-var app = getApp()
+const app = getApp()
 
 Page({
   data: {
     book: {},
     loading: false,
-    content: "",
+    content: '',
     showFooter: false,
     showModal: false,
     modalList: [],
     isChapterList: false,
     readIndex: 0,
-    currentSource: "",
+    currentSource: '',
     chapters: [],
-    toView: "#"
+    toView: '#'
   },
 
   onLoad: function (params) {
-    let [bookSources, chapters] = [[], []];
+    // let [bookSources, chapters] = [[], []];
     const book = wx.getStorageSync(params.id);
     const extra = book.extra;
     this.setData({ loading: true, book: book });
@@ -28,7 +28,7 @@ Page({
     if(extra){
       this.setData({book: book});
       this.getChapterContent(extra.readIndex || 0);
-      if(new Date(params.lastUpdated) > new Date(book.updated)) {
+      if(params.lastUpdated !== book.updated) {
         this.getNewestChapters();
       }
     } else {
@@ -52,18 +52,17 @@ Page({
   },
 
   getChapterContent: function(index){
-    if(index < 0){
-      return this.showToast('这已经是第一章啦！');
-    }
-
-    if(index > (this.data.book.extra.chapters.length -1)){
-      return this.showToast('没有最新章节啦， 请等候更新！');
-    }
     const chapter = this.data.book.extra.chapters[index || 0];
     if(chapter && chapter.link){
       this.setData({showFooter: false, showModal: false, loading: true});
       app.Api.fetchChapter(chapter.link).then((response) => {
-        this.setData({content: response.chapter.body, title: response.chapter.title, showModal: false, loading:false, readIndex: index});
+        this.setData({
+          content: response.chapter.body,
+          title: response.chapter.title,
+          showModal: false,
+          loading:false,
+          readIndex: index
+        });
         this.data.book.extra.readIndex = index;
         wx.setStorageSync(this.data.book._id, this.data.book);
       })
@@ -87,7 +86,6 @@ Page({
     const book = this.data.book;
     return app.Api.fetchChapters(book.extra.currentSource)
       .then(response => {
-        console.log("getNewestChapters callback");
         book.extra.chapters = response.chapters;
         this.setData({book: book, loading: false, chapters: response.chapters});
         wx.setStorageSync(book._id, book);
@@ -99,9 +97,8 @@ Page({
     const book = this.data.book;
     return app.Api.fetchBookSource(book._id)
       .then(response => {
-        console.log("getBookSources callback");
         const avalibleSources = response.filter((source) => {
-          return source.host != "vip.zhuishushenqi.com";
+          return source.host !== 'vip.zhuishushenqi.com';
         });
         if(!book.extra){
           book.extra = {}
@@ -142,12 +139,11 @@ Page({
 
   changeSource: function(e){
     const bookSource = e.currentTarget.dataset.source;
-    let book = this.data.book;
-    let chapters = [];
+    const book = this.data.book;
     this.setData({ loading: true });
     this.getNewestChapters()
       .then(response => {
-        book.extra.currentSource = bookSource;
+        book.extra.currentSource = bookSource._id;
         this.setData({book: book, showModal: false, loading: false});
         wx.setStorageSync(book._id, book);
         return this.getChapterContent(this.data.readIndex);
@@ -163,10 +159,19 @@ Page({
       }
     );;
   },
+
   prevChapter: function(){
-    this.getChapterContent(--this.data.readIndex);
+    if(this.data.readIndex <= 0){
+      return this.showToast('这已经是第一章啦！');
+    } else {
+      this.getChapterContent(--this.data.readIndex);
+    }
   },
   nextChapter: function(){
-    this.getChapterContent(++this.data.readIndex);
+    if(this.data.readIndex >= this.data.book.extra.chapters.length) {
+      return this.showToast('没有最新章节啦， 请等候更新！');
+    } else {
+      this.getChapterContent(++this.data.readIndex);
+    }
   }
 })
